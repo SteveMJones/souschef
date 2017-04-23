@@ -1,1 +1,2 @@
-# souschef
+# Installation
+./setup.py install
