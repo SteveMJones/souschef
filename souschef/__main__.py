@@ -1,21 +1,14 @@
 #!/usr/bin/env python
-import requests
-import argparse
+from __future__ import print_function
 
-from bs4 import BeautifulSoup
+import argparse
 
 from database.session import Session
 from database.model import Recipe, Asset, RecipeIngredient, Ingredient
 from database.util import init as database_init
 from database.util import reset as database_reset
 
-
-class Downloader(object):
-    def download(self):
-        print('Updating recipe cache...')
-        req = requests.get('https://www.hellofresh.com/archive/recipes/',
-                           params={'count': '100000'})
-        print(req.content)
+from parsers.hellofresh import HelloFresh
 
 
 # Main
@@ -29,8 +22,10 @@ def main():
     else:
         database_init()
 
-    downloader = Downloader()
-    # downloader.download()
+    helloFresh = HelloFresh()
+    helloFresh.parse()
+
+    '''
     session = Session()
 
     ingredient = Ingredient()
@@ -82,7 +77,7 @@ def main():
         ingredient = recipe_ingredient.ingredient
         print(recipe_ingredient.amount + ' ' +
               recipe_ingredient.unit + ' ' + ingredient.name)
-
+    '''
 
 if __name__ == '__main__':
     main()

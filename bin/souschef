@@ -2,4 +2,4 @@
 
 BINPATH=`dirname $0`
 cd $BINPATH/..
-python hello_fresh_recipes/main.py $@
+python souschef/__main__.py $@
