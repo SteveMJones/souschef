@@ -7,9 +7,9 @@ Base = declarative_base()
 
 
 class Recipe(Base):
-    __tablename__ = 'recipe'
+    __tablename__ = 'recipes'
     id = Column(Integer, primary_key=True)
-    uid = Column(String, nullable=False, unique=True)
+    uid = Column(String, unique=True)
     origin = Column(String)
     country = Column(String)
     name = Column(String)
@@ -23,9 +23,9 @@ class Recipe(Base):
     url = Column(String)
     published_date = Column(DateTime)
     created_date = Column(DateTime, default=func.now())
-    assets = relationship("Asset")
+    assets = relationship('Asset', backref='recipe')
     ingredients = relationship(
-        'RecipeIngredient', back_populates='recipe')
+        'RecipeIngredient', backref='recipe')
     instructions = relationship('Instruction', back_populates='recipe')
     nutrition = relationship('RecipeNutrition', back_populates='recipe')
     tags = relationship('RecipeTag', back_populates='recipe')
@@ -33,11 +33,11 @@ class Recipe(Base):
 
 
 class Asset(Base):
-    __tablename__ = 'asset'
+    __tablename__ = 'assets'
     id = Column(Integer, primary_key=True)
-    recipe_id = Column(Integer, ForeignKey('recipe.id'))
-    ingredient_id = Column(Integer, ForeignKey('ingredient.id'))
-    instruction_id = Column(Integer, ForeignKey('instruction.id'))
+    recipe_id = Column(Integer, ForeignKey('recipes.id'))
+    ingredient_id = Column(Integer, ForeignKey('ingredients.id'))
+    instruction_id = Column(Integer, ForeignKey('instructions.id'))
     type = Column(Enum('image', 'thumbnail', 'pdf'))
     url = Column(String)
     size = Column(String)
@@ -46,45 +46,44 @@ class Asset(Base):
     filename = Column(String)
     downloaded = Column(Binary)
     download_date = Column(DateTime)
-    recipe = relationship('Recipe', back_populates='assets')
-    ingredient = relationship('Ingredient', back_populates='image')
-    instruction = relationship("Instruction", back_populates='image')
+    error = Column(Binary)
+    error_code = Column(String)
+    error_msg = Column(String)
 
 
 class Ingredient(Base):
-    __tablename__ = 'ingredient'
+    __tablename__ = 'ingredients'
     id = Column(Integer, primary_key=True)
     name = Column(String)
     description = Column(String)
     contains = Column(String)
-    image = relationship('Asset', uselist=False, back_populates='ingredient')
+    image = relationship('Asset', uselist=False, backref='ingredient')
+    recipe_ingredients = relationship('RecipeIngredient', backref='ingredient')
 
 
 class RecipeIngredient(Base):
     __tablename__ = 'recipe_ingredient'
     id = Column(Integer, primary_key=True)
-    recipe_id = Column(Integer, ForeignKey('recipe.id'))
-    ingredient_id = Column(Integer, ForeignKey('ingredient.id'))
+    recipe_id = Column(Integer, ForeignKey('recipes.id'))
+    ingredient_id = Column(Integer, ForeignKey('ingredients.id'))
     amount = Column(String)
     unit = Column(String)
-    recipe = relationship('Recipe', back_populates='ingredients')
-    ingredient = relationship('Ingredient')
 
 
 class Instruction(Base):
-    __tablename__ = 'instruction'
+    __tablename__ = 'instructions'
     id = Column(Integer, primary_key=True)
-    recipe_id = Column(Integer, ForeignKey('recipe.id'))
+    recipe_id = Column(Integer, ForeignKey('recipes.id'))
     step = Column(Integer)
     description = Column(String)
-    image = relationship("Asset", uselist=False, back_populates='instruction')
+    image = relationship("Asset", uselist=False, backref='instruction')
     recipe = relationship("Recipe", back_populates='instructions')
 
 
 class RecipeNutrition(Base):
     __tablename__ = 'recipe_nutrition'
     id = Column(Integer, primary_key=True)
-    recipe_id = Column(Integer, ForeignKey('recipe.id'))
+    recipe_id = Column(Integer, ForeignKey('recipes.id'))
     nutrition_id = Column(Integer, ForeignKey('nutrition.id'))
     amount = Column(String)
     unit = Column(String)
@@ -102,14 +101,14 @@ class Nutrition(Base):
 class RecipeTag(Base):
     __tablename__ = 'recipe_tag'
     id = Column(Integer, primary_key=True)
-    recipe_id = Column(Integer, ForeignKey('recipe.id'))
-    tag_id = Column(Integer, ForeignKey('tag.id'))
+    recipe_id = Column(Integer, ForeignKey('recipes.id'))
+    tag_id = Column(Integer, ForeignKey('tags.id'))
     tag = relationship('Tag')
     recipe = relationship('Recipe', back_populates='tags')
 
 
 class Tag(Base):
-    __tablename__ = 'tag'
+    __tablename__ = 'tags'
     id = Column(Integer, primary_key=True)
     name = Column(String)
     description = Column(String)
@@ -118,14 +117,14 @@ class Tag(Base):
 class RecipeUtensil(Base):
     __tablename__ = 'recipe_utensil'
     id = Column(Integer, primary_key=True)
-    recipe_id = Column(Integer, ForeignKey('recipe.id'))
-    utensil_id = Column(Integer, ForeignKey('utensil.id'))
+    recipe_id = Column(Integer, ForeignKey('recipes.id'))
+    utensil_id = Column(Integer, ForeignKey('utensils.id'))
     recipe = relationship('Recipe', back_populates='utensils')
     utensil = relationship('Utensil')
 
 
 class Utensil(Base):
-    __tablename__ = 'utensil'
+    __tablename__ = 'utensils'
     id = Column(Integer, primary_key=True)
     name = Column(String)
     description = Column(String)

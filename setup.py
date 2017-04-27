@@ -5,8 +5,8 @@ from os import path
 from setuptools import find_packages, setup
 
 ROOT = path.dirname(__file__)
-NAME = 'hello_fresh_recipes'
-DESCRIPTION = 'Automatically download and parse Hello Fresh Recipes.'
+NAME = 'souschef'
+DESCRIPTION = 'Automatically download and parse recipes.'
 
 
 def get_version():
@@ -38,7 +38,8 @@ setup(
         'beautifulsoup4==4.5.3',
         'future==0.16.0',
         'configparser==3.5.0',
-        'sqlalchemy'
+        'sqlalchemy',
+        'tqdm'
     ],
     packages=get_packages(),
     entry_points={
