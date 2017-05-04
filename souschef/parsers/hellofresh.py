@@ -1,8 +1,7 @@
 import requests
 import json
-import sys
-reload(sys)
-sys.setdefaultencoding('utf-8')
+import re
+import demjson
 
 from tqdm import tqdm
 from sqlalchemy import exists
@@ -103,10 +102,14 @@ class HelloFresh(object):
     def download_recipe_data(cls, recipe):
         recipe_html = requests.get(recipe.url)
         soup = BeautifulSoup(recipe_html.text, 'html.parser')
-        script_jsons = soup.findAll("script")
-        for i in script_jsons:
-            if i.text is not None:
-                print(i.text)
-                file = open('script.txt', 'w+')
-                file.write(i.text)
-                file.close()
+        scripts = soup.findAll('script', {'defer': ''})
+        begin_search = '"' + recipe.uid + '":{'
+        end_search = '}},notifications:'
+
+        recipe_json = re.search(begin_search + '(.+?)' + end_search,
+                                scripts[5].text).group(1).replace(':!', ':')
+        recipe_json = '{' + recipe_json + '}'
+        recipe_obj = demjson.decode(recipe_json)
+        # print(recipe_obj)
+        for ingredient in recipe_obj['ingredients']:
+            print(ingredient)

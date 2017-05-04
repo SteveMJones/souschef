@@ -16,6 +16,7 @@ class Recipe(Base):
     headline = Column(String)
     time = Column(String)
     difficulty = Column(Integer)
+    servings = Column(Integer)
     favorites = Column(Integer)
     rating = Column(String)
     slug = Column(String)
@@ -56,6 +57,7 @@ class Ingredient(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String)
     description = Column(String)
+    code = Column(String)
     contains = Column(String)
     image = relationship('Asset', uselist=False, backref='ingredient')
     recipe_ingredients = relationship('RecipeIngredient', backref='ingredient')
@@ -66,8 +68,8 @@ class RecipeIngredient(Base):
     id = Column(Integer, primary_key=True)
     recipe_id = Column(Integer, ForeignKey('recipes.id'))
     ingredient_id = Column(Integer, ForeignKey('ingredients.id'))
-    amount = Column(String)
-    unit = Column(String)
+    amount = Column(String, default='1')
+    unit = Column(String, default='unit')
 
 
 class Instruction(Base):
@@ -95,6 +97,7 @@ class Nutrition(Base):
     __tablename__ = 'nutrition'
     id = Column(Integer, primary_key=True)
     name = Column(String)
+    code = Column(String)
     description = Column(String)
 
 

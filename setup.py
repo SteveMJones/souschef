@@ -39,7 +39,8 @@ setup(
         'future==0.16.0',
         'configparser==3.5.0',
         'sqlalchemy',
-        'tqdm'
+        'tqdm',
+        'demjson'
     ],
     packages=get_packages(),
     entry_points={

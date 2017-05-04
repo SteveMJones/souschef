@@ -1,130 +1,215 @@
-import requests
-import json
 import urlparse
-import uuid
+import json
+import requests
 
 from tqdm import tqdm
-from tqdm import trange
-from sqlalchemy import exists
 from bs4 import BeautifulSoup
 
+from util import IngredientParser
 from database.session import Session
-from database.model import Recipe, Asset, RecipeTag, Tag
+from database.model import Recipe, Asset, Ingredient, RecipeIngredient
+from database.model import Nutrition, RecipeNutrition, Instruction
 from database.util import get_or_create
 from utils.logger import Logger
+
 
 SERVICE_NAME = 'Purple Carrot'
 SERVICE_CODE = 'purplecarrot'
 RECIPE_API = 'https://www.purplecarrot.com/plant-based-recipes'
-RECIPE_API_PAGES_COUNT = 20
+
+RECIPE_API_PAGE_SCAN_START = 20
+RECIPES_PER_PAGE = 20
 RECIPE_BATCH_COUNT = 1000
 
 LOG = Logger(SERVICE_NAME)
 
 
 class PurpleCarrot(object):
-    maxApiPage = None
+    max_api_page = None
+    num_of_recipes = None
 
     """Purple Carrot parser and downloader"""
     @classmethod
     def __init__(cls):
         cls.hostname = urlparse.urlparse(RECIPE_API).hostname or ''
+
+    @classmethod
+    def download_all(cls):
+        """Downloads full recipe data"""
+        # Get max page
+        cls.get_max_recipe_page()
+
+        # Download meta data
+        cls.get_recipe_meta_data()
+
+        # Download full recipe data
+        cls.get_recipe_data()
+
+    @classmethod
+    def get_max_recipe_page(cls):
+        """Parses recipe pages to find max page number"""
         LOG.printLog('Finding recipes to download...')
-        page = RECIPE_API_PAGES_COUNT
+        page = RECIPE_API_PAGE_SCAN_START
+        last_page_recipe_num = 20
         while True:
             req = requests.get(RECIPE_API, params={'page': page})
             soup = BeautifulSoup(req.text, 'html.parser')
             recipes = soup.find('ul', {'class': 'row'}).findAll('li')
             if not recipes:
-                cls.maxApiPage = page
+                cls.max_api_page = page
+                cls.num_of_recipes = RECIPES_PER_PAGE * \
+                    (page - 2) + last_page_recipe_num
                 break
+            last_page_recipe_num = len(recipes)
             page += 1
 
     @classmethod
-    def download_all(cls):
-        """Downloads full recipe data"""
-        cls.get_recipe_meta_data()
-        return
-        # Download meta data
-        cls.download_recipe_meta_data()
-
-        # Download full recipe data
-        session = Session()
-        recipes = session.query(Recipe).filter(
-            Recipe.origin == SERVICE_CODE).all()
-
-        for recipe in recipes:
-            cls.download_recipe_data(recipe)
+    def get_recipe_batch_count(cls):
+        if RECIPE_BATCH_COUNT < cls.num_of_recipes:
+            return RECIPE_BATCH_COUNT
+        else:
+            return cls.num_of_recipes
 
     @classmethod
     def get_recipe_meta_data(cls):
         """Downloads recipe metadata"""
-        LOG.printLog('Parsing and saving recipe meta data...')
-        recipeCount = 1
-        for page in trange(1, cls.maxApiPage, unit='recipe pages'):
-            req = requests.get(RECIPE_API, params={'page': page})
-            soup = BeautifulSoup(req.text, 'html.parser')
-            section = soup.find('section', {'id': 'archive-recipes'})
-            recipes = section.findAll('li')
-            for recipe_html in recipes:
-                if recipeCount > RECIPE_BATCH_COUNT:
-                    return
-                cls.download_recipe_meta_data(recipe_html)
-                recipeCount += 1
-            page += 1
-
-    @classmethod
-    def parse_recipe_html(cls, recipe_html):
-        recipe_dto = RecipeDTO()
-        recipe_dto.name = recipe_html.img['title']
-        recipe_dto.slug = recipe_html.a['href'].replace('/plant-based-recipes/','')
-        recipe_dto.url = 'https://' + cls.hostname + str(recipe_html.a['href'])
-        recipe_dto.image_url = recipe_html.img['src']
-        recipe_dto.origin = SERVICE_CODE
-        recipe_dto.country = 'US'
-        return recipe_dto
-
-    @classmethod
-    def download_recipe_meta_data(cls, recipe_html):
-        """Persists recipe meta data from html object"""
-
-        recipe_dto = cls.parse_recipe_html(recipe_html)
-
         session = Session()
-        recipe = get_or_create(session, Recipe, slug=recipe_dto.slug)
 
-        recipe.name = recipe_dto.name
-        recipe.origin = recipe_dto.origin
-        recipe.slug = recipe_dto.slug
-        recipe.country = recipe_dto.country
-        recipe.url = recipe_dto.url
+        # loading bar based on recipe count
+        recipe_count = 1
+        recipe_batch_count = cls.get_recipe_batch_count()
+        LOG.printLog('Parsing and saving recipe meta data')
+        with tqdm(total=recipe_batch_count, desc=LOG.format(''), unit=' recipes') as pbar:
+            for page in range(1, cls.max_api_page):
+                req = requests.get(RECIPE_API, params={'page': page})
+                soup = BeautifulSoup(req.text, 'html.parser')
+                section = soup.find('section', {'id': 'archive-recipes'})
+                recipes = section.findAll('li')
+                for recipe_html in recipes:
+                    if recipe_count > RECIPE_BATCH_COUNT:
+                        return
 
-        assets = []
-        image = Asset()
-        image.type = 'thumbnail'
-        image.url = recipe_dto.image_url
-        assets.append(image)
+                    slug = recipe_html.a['href'].replace(
+                        '/plant-based-recipes/', '')
+                    recipe = get_or_create(session, Recipe, slug=slug)
 
-        recipe.assets = assets
+                    recipe.name = recipe_html.img['title']
+                    recipe.slug = slug
+                    recipe.url = 'https://' + cls.hostname + \
+                        str(recipe_html.a['href'])
+                    recipe.origin = SERVICE_CODE
+                    recipe.country = 'US'
 
-        session.add(recipe)
-        session.commit()
+                    assets = []
+                    thumbnail_url = recipe_html.img['src']
+                    thumbnail = get_or_create(
+                        session, Asset, url=thumbnail_url)
+                    thumbnail.type = 'thumbnail'
+                    thumbnail.url = thumbnail_url
+                    assets.append(thumbnail)
+
+                    recipe.assets = assets
+
+                    session.add(recipe)
+                    session.commit()
+
+                    pbar.update(1)
+                    recipe_count += 1
+                page += 1
 
     @classmethod
-    def download_recipe_data(cls, recipe):
-        recipe_html = requests.get(recipe.url)
-        soup = BeautifulSoup(recipe_html.text, 'html.parser')
-        script_jsons = soup.findAll("script")
-        for i in script_jsons:
-            if i.text is not None:
-                print(i.text)
+    def get_recipe_data(cls):
+        session = Session()
 
+        recipes_dto = session.query(Recipe).filter(
+            Recipe.origin == SERVICE_CODE).all()
 
-class RecipeDTO(object):
-    def __init__(self):
-        self.name = None
-        self.uid = None
-        self.slug = None
-        self.image_url = None
-        self.url = None
-        self.country = None
+        LOG.printLog('Parsing and saving recipe data')
+        for recipe_dto in tqdm(recipes_dto, desc=LOG.format(''), unit=' recipes'):
+            recipe_html = requests.get(recipe_dto.url)
+            soup = BeautifulSoup(recipe_html.text, 'html.parser')
+
+            # Main Image
+            tag = soup.find('source', {'media': '(max-width: 1199px)'})
+            image_url = tag['srcset']
+            image = get_or_create(session, Asset, url=image_url)
+            image.type = 'image'
+            image.url = image_url
+            recipe_dto.assets.append(image)
+
+            # Description
+            description = soup.find(
+                'section', {'class': 'recipe-description'}).find('p')
+            recipe_dto.description = description.text
+
+            # Summary
+            uls = soup.find('div', {'class': 'recipe-side-note'}).findAll('ul')
+            li = uls[0].findAll('li')
+            prep = li[0].text.split(':')
+            recipe_dto.time = prep[1].replace('minutes', 'M').replace(
+                'hour', 'H').replace(' ', '').strip()
+            servings = li[1].text.split(':')
+            recipe_dto.servings = servings[1]
+
+            # Nutrition
+            for li in uls[1].findAll('li'):
+                nutrition = li.text.split(':')
+                nutrition_name = nutrition[0].strip()
+                nutrition_code = nutrition_name.lower().replace(' ', '-')
+
+                nutrition_dto = get_or_create(
+                    session, Nutrition, code=nutrition_code)
+                nutrition_dto.name = nutrition_name
+
+                nutrition_amount = nutrition[1].strip()
+                nutrition_unit = None
+
+                if nutrition_code == 'calories':
+                    nutrition_unit = 'cal'
+                else:
+                    nutrition_unit = 'g'
+
+                recipe_nutrition_dto = get_or_create(
+                    session, RecipeNutrition, recipe=recipe_dto, nutrition=nutrition_dto)
+                recipe_nutrition_dto.amount = nutrition_amount
+                recipe_nutrition_dto.unit = nutrition_unit
+
+            # Ingredients
+            main_recipe = soup.find('section', {'class': 'main-recipe'})
+            ingredients = main_recipe.find('ol').findAll('li')
+            ingredient_parser = IngredientParser()
+            for ingredient in ingredients:
+                recipe_ingredient_dtos = ingredient_parser.parse_ingredients(
+                    ingredient.string)
+                if recipe_ingredient_dtos:
+                    for recipe_ingredient_dto in recipe_ingredient_dtos:
+                        ingredient_dto = get_or_create(
+                            session, Ingredient, code=recipe_ingredient_dto.ingredient.code)
+                        ingredient_dto.name = recipe_ingredient_dto.ingredient.name
+
+                        recipe_ingredient = get_or_create(
+                            session, RecipeIngredient, recipe=recipe_dto, ingredient=ingredient_dto)
+                        recipe_ingredient.ingredient = ingredient_dto
+
+                        if recipe_ingredient_dto.amount is not None:
+                            recipe_ingredient.amount = recipe_ingredient_dto.amount
+
+                        if recipe_ingredient_dto.unit is not None:
+                            recipe_ingredient.unit = recipe_ingredient_dto.unit
+
+            # Instructions
+            steps = soup.find(
+                'section', {'class': 'recipe-instruct'}).findAll('div', {'class': 'row'})
+            stepNbr = 1
+            for step in steps[1:]:
+                instruction_dto = get_or_create(
+                    session, Instruction, recipe=recipe_dto, step=stepNbr)
+                instruction_dto.description = step.find(
+                    'p', {'class': 'instruction-description'}).text
+
+                instruction_image_dto = get_or_create(
+                    session, Asset, instruction=instruction_dto, type='image')
+                instruction_image_dto.url = step.find('img')['src']
+                stepNbr += 1
+
+            session.commit()

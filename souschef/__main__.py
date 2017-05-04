@@ -23,7 +23,7 @@ def main():
         database_reset()
     else:
         database_init()
-
+    
     '''
     hello_fresh = HelloFresh()
     hello_fresh.download_all()
