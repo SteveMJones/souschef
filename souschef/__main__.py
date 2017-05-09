@@ -6,10 +6,7 @@ import logging.config
 import argparse
 import yaml
 
-from database.session import Session
-from database.model import Recipe, Asset, RecipeIngredient, Ingredient
-from database.util import init as database_init
-from database.util import reset as database_reset
+import database.util as db_util
 
 # from parsers.hellofresh import HelloFresh
 from parsers.purplecarrot import PurpleCarrot
@@ -20,18 +17,19 @@ def main():
     """Main execution point"""
     logging.config.dictConfig(yaml.load(open('logging.conf', 'r')))
     logger = logging.getLogger('main')
+
     logger.info('Running souschef')
     logger.debug('main() - start')
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-rd', '--resetdb', action='store_true')
     args = parser.parse_args()
 
     if args.resetdb:
-        database_reset()
+        db_util.reset()
     else:
-        database_init()
-    
+        db_util.init()
+
     '''
     hello_fresh = HelloFresh()
     hello_fresh.download_all()

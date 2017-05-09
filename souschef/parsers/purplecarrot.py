@@ -28,7 +28,7 @@ class PurpleCarrot(object):
     """Purple Carrot parser and downloader"""
     @classmethod
     def __init__(cls):
-        cls.logger = logging.getLogger('parsers.' + SERVICE_CODE)
+        cls.logger = logging.getLogger(__name__)
         cls.hostname = urlparse.urlparse(RECIPE_API).hostname or ''
 
     @classmethod
@@ -92,6 +92,7 @@ class PurpleCarrot(object):
                     recipe = get_or_create(session, Recipe, slug=slug)
 
                     recipe.name = recipe_html.img['title']
+                    cls.logger.info('Parsing recipe: ' + recipe.name)
                     recipe.slug = slug
                     recipe.url = 'https://' + cls.hostname + \
                         str(recipe_html.a['href'])
@@ -124,6 +125,7 @@ class PurpleCarrot(object):
 
         cls.logger.info('Parsing and saving recipe data')
         for recipe_dto in tqdm(recipes_dto, unit=' recipes'):
+            cls.logger.info('Downloading recipe: ' + recipe_dto.name)
             recipe_html = requests.get(recipe_dto.url)
             soup = BeautifulSoup(recipe_html.text, 'html.parser')
 
