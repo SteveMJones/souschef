@@ -3,7 +3,7 @@ import os
 
 import configparser
 
-CONFIG_FILE_PATH = 'configFile.cfg'
+CONFIG_FILE_PATH = 'souschef.conf'
 
 
 class Config(object):
@@ -13,7 +13,7 @@ class Config(object):
         if not self.configuration.read(CONFIG_FILE_PATH):
             raise configparser.Error('{} file not found'
                                      .format(CONFIG_FILE_PATH))
-        self.data_dir = self.configuration.get("DIRECTORIES", 'data_dir')
 
+        self.data_dir = self.configuration.get("SYSTEM", 'data_dir')
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)

@@ -1,6 +1,7 @@
 import urlparse
 import json
 import requests
+import logging
 
 from tqdm import tqdm
 from bs4 import BeautifulSoup
@@ -10,8 +11,6 @@ from database.session import Session
 from database.model import Recipe, Asset, Ingredient, RecipeIngredient
 from database.model import Nutrition, RecipeNutrition, Instruction
 from database.util import get_or_create
-from utils.logger import Logger
-
 
 SERVICE_NAME = 'Purple Carrot'
 SERVICE_CODE = 'purplecarrot'
@@ -19,9 +18,7 @@ RECIPE_API = 'https://www.purplecarrot.com/plant-based-recipes'
 
 RECIPE_API_PAGE_SCAN_START = 20
 RECIPES_PER_PAGE = 20
-RECIPE_BATCH_COUNT = 1000
-
-LOG = Logger(SERVICE_NAME)
+RECIPE_BATCH_COUNT = 50
 
 
 class PurpleCarrot(object):
@@ -31,6 +28,7 @@ class PurpleCarrot(object):
     """Purple Carrot parser and downloader"""
     @classmethod
     def __init__(cls):
+        cls.logger = logging.getLogger('parsers.' + SERVICE_CODE)
         cls.hostname = urlparse.urlparse(RECIPE_API).hostname or ''
 
     @classmethod
@@ -40,15 +38,15 @@ class PurpleCarrot(object):
         cls.get_max_recipe_page()
 
         # Download meta data
-        cls.get_recipe_meta_data()
+        cls.download_recipe_meta_data()
 
         # Download full recipe data
-        cls.get_recipe_data()
+        cls.download_recipe_data()
 
     @classmethod
     def get_max_recipe_page(cls):
         """Parses recipe pages to find max page number"""
-        LOG.printLog('Finding recipes to download...')
+        cls.logger.info('Finding recipes to download')
         page = RECIPE_API_PAGE_SCAN_START
         last_page_recipe_num = 20
         while True:
@@ -71,15 +69,15 @@ class PurpleCarrot(object):
             return cls.num_of_recipes
 
     @classmethod
-    def get_recipe_meta_data(cls):
+    def download_recipe_meta_data(cls):
         """Downloads recipe metadata"""
         session = Session()
 
         # loading bar based on recipe count
         recipe_count = 1
         recipe_batch_count = cls.get_recipe_batch_count()
-        LOG.printLog('Parsing and saving recipe meta data')
-        with tqdm(total=recipe_batch_count, desc=LOG.format(''), unit=' recipes') as pbar:
+        cls.logger.info('Parsing and saving recipe meta data')
+        with tqdm(total=recipe_batch_count, unit=' recipes') as pbar:
             for page in range(1, cls.max_api_page):
                 req = requests.get(RECIPE_API, params={'page': page})
                 soup = BeautifulSoup(req.text, 'html.parser')
@@ -118,14 +116,14 @@ class PurpleCarrot(object):
                 page += 1
 
     @classmethod
-    def get_recipe_data(cls):
+    def download_recipe_data(cls):
         session = Session()
 
         recipes_dto = session.query(Recipe).filter(
             Recipe.origin == SERVICE_CODE).all()
 
-        LOG.printLog('Parsing and saving recipe data')
-        for recipe_dto in tqdm(recipes_dto, desc=LOG.format(''), unit=' recipes'):
+        cls.logger.info('Parsing and saving recipe data')
+        for recipe_dto in tqdm(recipes_dto, unit=' recipes'):
             recipe_html = requests.get(recipe_dto.url)
             soup = BeautifulSoup(recipe_html.text, 'html.parser')
 
@@ -146,8 +144,8 @@ class PurpleCarrot(object):
             uls = soup.find('div', {'class': 'recipe-side-note'}).findAll('ul')
             li = uls[0].findAll('li')
             prep = li[0].text.split(':')
-            recipe_dto.time = prep[1].replace('minutes', 'M').replace(
-                'hour', 'H').replace(' ', '').strip()
+            time = prep[1].replace('minutes', 'M').replace(' ', '')
+            recipe_dto.time = time[:time.find('M')+1]
             servings = li[1].text.split(':')
             recipe_dto.servings = servings[1]
 

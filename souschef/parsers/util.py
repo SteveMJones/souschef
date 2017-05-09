@@ -6,30 +6,48 @@ from database.model import Ingredient, RecipeIngredient
 class IngredientParser(object):
 
     def __init__(self):
-        self.char_replacement = {u'\x215b': '1/8',
-                                 u'\x2153': '1/3',
-                                 u'\x2154': '2/3',
-                                 u'\xbc': '1/4',
-                                 u'\xbe': '3/4',
-                                 u'\xbd': '1/2',
-                                 '\*': ''}
-        self.units = ['tsp', 'tbsp', 'cup', 'oz', 'pack', 'can', 'package']
-        self.rejects = ['not included']
+        self.replace_list = {u'\u215B': '1/8',
+                             u'\u2153': '1/3',
+                             u'\u2154': '2/3',
+                             u'\u00BC': '1/4',
+                             u'\u00BE': '3/4',
+                             u'\u00BD': '1/2',
+                             'ounce': 'oz',
+                             'ounces': 'oz',
+                             'teaspoon': 'tsp',
+                             'tablespoon': 'tbsp',
+                             'tablespoons': 'tbsp',
+                             'cups': 'cup',
+                             'inches': 'inch',
+                             'bunches': 'bunch'}
+        self.remove_list = ['*', '-', ',', 'of', 'divided', 'fresh']
 
-    def strip_bad_characters(self, text):
-        for i in self.char_replacement.keys():
-            text = re.sub(i, self.char_replacement[i], text)
+        self.reject_list = ['not included']
+
+        self.units = ['tsp', 'tbsp', 'cup', 'oz',
+                      'pack', 'can', 'package', 'sprigs',
+                      'knob', 'inch', 'bunch', 'pieces',
+                      'piece']
+
+    def replace_text(self, text):
+        for i in self.replace_list.keys():
+            text = re.sub(i, self.replace_list[i], text)
+        
+        for i in self.remove_list:
+            text = text.replace(i, '')
+            
         return text
 
     def test_rejections(self, text):
-        if text.lower() in self.rejects:
+        if text.lower() in self.reject_list:
             return True
-        elif len(text.split(' ')) > 5:
+        if len(text) > 40:
             return True
         return False
 
     def parse_ingredients(self, ingredients):
-        ingredients = self.strip_bad_characters(ingredients)
+        ingredients = self.replace_text(ingredients)
+
         if self.test_rejections(ingredients):
             return False
 
@@ -39,9 +57,10 @@ class IngredientParser(object):
             ingredients_parsed.append(
                 self.parse_ingredient(ingredients_split[1]))
             ingredients_parsed.append(self.parse_ingredient(
-                ingredients_split[0] + ' ' + ingredients_parsed[0].name))
+                ingredients_split[0] + ' ' + ingredients_parsed[0].ingredient.name))
         else:
             ingredients_parsed.append(self.parse_ingredient(ingredients))
+
         return ingredients_parsed
 
     def parse_ingredient(self, ingredient):
@@ -74,9 +93,9 @@ class IngredientParser(object):
         elif amount:
             recipe_ingredient_dto.amount = ingredient[0].lower()
             start = 1
-        
-        ingredient_dto.name = ' '.join(ingredient[start:]).lower()
-        ingredient_dto.code = '-'.join(ingredient[start:]).lower()
+
+        ingredient_dto.name = ' '.join(ingredient[start:]).lower().strip()
+        ingredient_dto.code = ingredient_dto.name.replace(' ', '-')
         recipe_ingredient_dto.ingredient = ingredient_dto
 
         return recipe_ingredient_dto
