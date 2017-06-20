@@ -8,7 +8,7 @@ import yaml
 
 import database.util as db_util
 
-# from parsers.hellofresh import HelloFresh
+from parsers.hellofresh import HelloFresh
 from parsers.purplecarrot import PurpleCarrot
 
 
@@ -30,12 +30,12 @@ def main():
     else:
         db_util.init()
 
-    '''
     hello_fresh = HelloFresh()
     hello_fresh.download_all()
     '''
     purple_carrot = PurpleCarrot()
     purple_carrot.download_all()
+    '''
     logger.debug('main() - end')
 
 if __name__ == '__main__':

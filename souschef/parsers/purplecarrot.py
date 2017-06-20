@@ -179,7 +179,7 @@ class PurpleCarrot(object):
             ingredients = main_recipe.find('ol').findAll('li')
             ingredient_parser = IngredientParser()
             for ingredient in ingredients:
-                recipe_ingredient_dtos = ingredient_parser.parse_ingredients(
+                recipe_ingredient_dtos = ingredient_parser.clense_ingredients(
                     ingredient.string)
                 if recipe_ingredient_dtos:
                     for recipe_ingredient_dto in recipe_ingredient_dtos:

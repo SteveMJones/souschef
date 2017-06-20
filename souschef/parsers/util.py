@@ -44,12 +44,19 @@ class IngredientParser(object):
         if len(text) > 40:
             return True
         return False
-
-    def parse_ingredients(self, ingredients):
+    
+    def clense_ingredients(self, ingredients):
         ingredients = self.replace_text(ingredients)
 
         if self.test_rejections(ingredients):
             return False
+        return ingredients
+
+    def parse_ingredients_with_amounts(self, ingredients):
+        
+        ingredients = self.clense_ingredients(ingredients)
+        if not ingredients:
+            return ingredients
 
         ingredients_parsed = []
         if ingredients.find('+') is not -1:

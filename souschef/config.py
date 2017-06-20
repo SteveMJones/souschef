@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-
+import yaml
 import configparser
 
 CONFIG_FILE_PATH = 'souschef.conf'
@@ -8,12 +8,9 @@ CONFIG_FILE_PATH = 'souschef.conf'
 
 class Config(object):
     def __init__(self):
-        self.configuration = configparser.ConfigParser()
+        with open(CONFIG_FILE_PATH, 'r') as ymlfile:
+            cfg = yaml.load(ymlfile)
 
-        if not self.configuration.read(CONFIG_FILE_PATH):
-            raise configparser.Error('{} file not found'
-                                     .format(CONFIG_FILE_PATH))
-
-        self.data_dir = self.configuration.get("SYSTEM", 'data_dir')
+        self.data_dir = cfg['main']['data']
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
